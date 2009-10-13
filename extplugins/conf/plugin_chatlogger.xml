@@ -1,0 +1,27 @@
+<configuration plugin="chatlogger">
+	<!-- optionally you can choose a different name for the table used 
+	to store the log. Default is 'chatlog'. To do so, uncomment the 
+	following part: -->
+	<!--<settings name="database">
+		<set name="db_table">chatlog2</set>
+	</settings>-->
+	
+	<settings name="purge">
+		<!-- how long (in days) do you want the history to be kept for. 
+				0 : keep chat log history for ever (default value)
+				You can use the following syntax as well
+				3d : purge all chat older than 3 days
+				2w : two weeks
+				6m : six month
+				1y : one year
+		-->
+		<set name="max_age">0</set>
+
+		<!-- The purge action takes place once a day at the time define below.
+		Default time is midnight -->
+		<set name="hour">0</set>
+		<!-- hour between 0 and 23 -->
+		<set name="min">0</set>
+		<!-- min between 0 and 59 -->
+	</settings>
+</configuration>
