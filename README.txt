@@ -45,3 +45,6 @@ Changelog
    log to database. Usefull if multiple instances of the
    bot share the same database.
    Thanks to Eire.32 for bringing up the idea and testing.
+   
+11/04/2011 - 0.2.1 - Courgette
+ - update the sql script to use the utf8 charset

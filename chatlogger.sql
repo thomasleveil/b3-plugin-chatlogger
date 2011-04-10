@@ -12,4 +12,4 @@ CREATE TABLE `chatlog` (
   `target_team` tinyint(1) default NULL,
   PRIMARY KEY  (`id`),
   KEY `client` (`client_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
