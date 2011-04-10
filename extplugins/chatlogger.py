@@ -197,15 +197,22 @@ class ChatData(object):
     self.msg = event.data
     
   def _insertquery(self):
-    return "INSERT INTO %s (msg_time, msg_type, client_id, client_name, client_team, msg) VALUES (%s, \"%s\", %s, \"%s\", %s, \"%s\")" % (self._table, self.plugin.console.time(), self.msg_type, self.client_id, self.client_name.replace('\\','\\\\').replace('"','\\"'), self.client_team, self.msg.replace('\\','\\\\').replace('"','\\"'))
-
+    return """INSERT INTO {table_name} 
+        (msg_time, msg_type, client_id, client_name, client_team, msg) 
+        VALUES (%(time)s, %(type)s, %(client_id)s, %(client_name)s, %(client_team)s, %(msg)s) """.format(table_name=self._table)
+        
   def save(self):
     self.plugin.debug("%s, %s, %s, %s"% (self.msg_type, self.client_id, self.client_name, self.msg))
     
     q = self._insertquery()
-    self.plugin.debug("query: %s" % q)
-    
-    cursor = self.plugin.console.storage.query(q)
+    data = {'time':self.plugin.console.time(), 
+     'type': self.msg_type, 
+     'client_id': self.client_id, 
+     'client_name': self.client_name, 
+     'client_team': self.client_team,
+     'msg': self.msg}
+
+    cursor = self.plugin.console.storage.query(q, data)
     if (cursor.rowcount > 0):
       self.plugin.debug("rowcount: %s, id:%s" % (cursor.rowcount, cursor.lastrowid))
     else:
