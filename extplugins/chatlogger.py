@@ -1,3 +1,4 @@
+# encoding: utf-8
 #
 # ChatLogger Plugin for BigBrotherBot
 # Copyright (C) 2008 Courgette
@@ -35,11 +36,15 @@
 #   Thanks to Eire.32 for bringing up the idea and testing.
 # 11/04/2011 - 0.2.1 - Courgette
 # - update the sql script to use the utf8 charset
+# 16/04/2011 - 1.0.0 - Courgette
+# - can log to a file instead of logging to db (or both) 
+#
 
-__version__ = '0.2.1'
+__version__ = '1.0.0'
 __author__  = 'Courgette'
 
 import b3, time, threading, re
+import logging
 from b3 import clients
 import b3.events
 import b3.plugin
@@ -55,6 +60,11 @@ class ChatloggerPlugin(b3.plugin.Plugin):
   _hours = None
   _minutes = None
   _db_table = None
+  _file_name = None
+  _filelogger = None
+  _save2db = None
+  _save2file = None
+  _file_rotation_rate = None
   
   
   def onLoadConfig(self):
@@ -62,6 +72,73 @@ class ChatloggerPlugin(b3.plugin.Plugin):
     if self._cronTab:
       self.console.cron - self._cronTab
 
+    try:
+      self._save2db = self.config.getboolean('general', 'save_to_database')
+      self.debug('save chat to database : %s', 'enabled' if self._save2db else 'disabled')
+    except b3.config.ConfigParser.NoOptionError:
+      self._save2db = True
+      self.info("Using default value '%s' for save_to_database", self._save2db)
+    except ValueError, err:
+      self._save2db = True
+      self.warning('Unexpected value for save_to_database. Using default value (%s) instead. (%s)', self._save2db, err) 
+
+    try:
+      self._save2file = self.config.getboolean('general', 'save_to_file')
+      self.debug('save chat to file : %s', 'enabled' if self._save2file else 'disabled')
+    except b3.config.ConfigParser.NoOptionError:
+      self._save2file = False
+      self.info("Using default value '%s' for save_to_file", self._save2file)
+    except ValueError, err:
+      self._save2file = False
+      self.warning('Unexpected value for save_to_file. Using default value (%s) instead. (%s)', self._save2file, err) 
+        
+    if not (self._save2db or self._save2file):
+        self.warning("your config explicitly specify to log nowhere. Disabling plugin")
+        self.disable()
+        
+    if self._save2db:
+        self.loadConfig_database()
+    if self._save2file:
+        self.loadConfig_file()
+  
+  
+  def loadConfig_file(self):
+    try:
+      self._file_name = self.config.getpath('file', 'logfile')
+      self.info('Using file (%s) to store log', self._file_name)
+    except Exception, e:
+      self.error('error while reading logfile name. disabling logging to file')
+      self._save2file = False
+      return
+    
+    try:
+      self._file_rotation_rate = self.config.get('file', 'rotation_rate')
+      if self._file_rotation_rate.upper() not in ('H', 'D', 'W0', 'W1', 'W2', 'W3', 'W4', 'W5', 'W6'):
+          raise ValueError, 'Invalid rate specified: %s' % self._file_rotation_rate
+      self.info("Using value '%s' for the file rotation rate", self._file_rotation_rate)
+    except b3.config.ConfigParser.NoOptionError:
+      self._file_rotation_rate = 'D'
+      self.info("Using default value '%s' for the file rotation rate", self._file_rotation_rate)
+    except ValueError, e:
+      self._file_rotation_rate = 'D'
+      self.warning("unexpected value for file rotation rate. Falling back on default value : '%s' (%s)", self._file_rotation_rate, e)
+    
+    self.setup_fileLogger()
+
+      
+  def setup_fileLogger(self):
+    try:
+      self._filelogger = logging.getLogger('chatlogfile')
+      handler = logging.handlers.TimedRotatingFileHandler(self._file_name, when=self._file_rotation_rate, encoding="UTF-8")
+      handler.setFormatter(logging.Formatter('%(asctime)s\t%(message)s', '%y-%m-%d %H:%M:%S'))
+      self._filelogger.addHandler(handler)
+      self._filelogger.setLevel(logging.INFO)
+    except Exception, e:
+      self._save2file = False
+      self.error("cannot setup file chat logger. disabling logging to file (%s)", e)
+  
+  
+  def loadConfig_database(self):
     try:
       self._db_table = self.config.get('database', 'db_table')
       self.debug('Using table (%s) to store log', self._db_table)
@@ -131,6 +208,7 @@ class ChatloggerPlugin(b3.plugin.Plugin):
       self.console.cron + self._cronTab
     else:
       self.info("chat log messages are kept forever")
+      
   
   def startup(self):
     """\
@@ -204,6 +282,17 @@ class ChatData(object):
   def save(self):
     self.plugin.debug("%s, %s, %s, %s"% (self.msg_type, self.client_id, self.client_name, self.msg))
     
+    if self.plugin._save2file:
+        self._save2file()
+    if self.plugin._save2db:
+        self._save2db()
+
+  def _save2file(self):
+      self.plugin.debug("writing to file")
+      self.plugin._filelogger.info("@%s [%s] to %s:\t%s"% (self.client_id, self.client_name, self.msg_type, self.msg))
+        
+  def _save2db(self):
+    self.plugin.debug("writing to database")
     q = self._insertquery()
     data = {'time':self.plugin.console.time(), 
      'type': self.msg_type, 
@@ -216,7 +305,7 @@ class ChatData(object):
     if (cursor.rowcount > 0):
       self.plugin.debug("rowcount: %s, id:%s" % (cursor.rowcount, cursor.lastrowid))
     else:
-      self.plugin.warn("inserting chat failed")
+      self.plugin.warning("inserting chat failed")
       
       
     
@@ -245,3 +334,73 @@ class PrivateChatData(ChatData):
   def _insertquery(self):
     return "INSERT INTO %s (msg_time, msg_type, client_id, client_name, client_team, msg, target_id, target_name, target_team) VALUES (%s, \"%s\", %s, \"%s\", %s, \"%s\", %s, \"%s\", %s)" % (self._table, self.plugin.console.time(), self.msg_type, self.client_id, self.client_name.replace('\\','\\\\').replace('"','\\"'), self.client_team, self.msg.replace('\\','\\\\').replace('"','\\"'), self.target_id, self.target_name.replace('\\','\\\\').replace('"','\\"'), self.target_team)
   
+
+
+if __name__ == '__main__':
+        from b3.fake import fakeConsole, joe, simon
+        
+        conf1 = b3.config.XmlConfigParser()
+        conf1.loadFromString("""
+        <configuration plugin="chatlogger">
+
+            <settings name="general">
+             <!-- do you want to save chat log to database ? -->
+             <set name="save_to_database">Yes</set>
+             
+             <!-- do you want to save chat log to a file ? -->
+           <set name="save_to_file">no</set>
+            </settings>
+        
+          <settings name="file">
+            <!-- location of the chat log file -->
+            <set name="logfile">@conf/chat.log</set>
+            <!-- file rotation rate. Can be either :
+              H : every hour
+              D : every day
+              W0 : every monday
+              W1 : every tuesday
+              W6 : every sunday
+             -->
+              <set name="rotation_rate">D</set>
+          </settings>
+        
+          <!-- optionally you can choose a different name for the table used 
+          to store the log. Default is 'chatlog'. To do so, uncomment the 
+          following part: -->
+          <!--<settings name="database">
+            <set name="db_table">chatlog2</set>
+          </settings>-->
+            
+            <settings name="purge">
+                <!-- how long (in days) do you want the history to be kept for. 
+                        0 : keep chat log history for ever (default value)
+                        You can use the following syntax as well
+                        3d : purge all chat older than 3 days
+                        2w : two weeks
+                        6m : six month
+                        1y : one year
+                -->
+                <set name="max_age">0</set>
+        
+                <!-- The purge action takes place once a day at the time define below.
+                Default time is midnight -->
+                <set name="hour">0</set>
+                <!-- hour between 0 and 23 -->
+                <set name="min">0</set>
+                <!-- min between 0 and 59 -->
+            </settings>
+        </configuration>
+        """)  
+        p = ChatloggerPlugin(fakeConsole, conf1)
+        p.onStartup()
+        
+        joe.connects(1)
+        simon.connects(3)
+        
+        while True:
+            joe.says("hello")
+            time.sleep(5)
+            simon.says("hi")
+            time.sleep(5)
+            joe.says2team("team test")
+            time.sleep(20)

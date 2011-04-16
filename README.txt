@@ -1,13 +1,13 @@
-chatlogger plugin for Big Brother Bot (www.bigbrotherbot.com)
+chatlogger plugin for Big Brother Bot (www.bigbrotherbot.net)
 =============================================================
 
-By #UbU#Courgette
+By Courgette
 
 
 Description
 -----------
 
-This plugin logs to database all clients' messages (chat, team chat, private chat).
+This plugin logs to database and/or file all clients' messages (chat, team chat, private chat).
 Forum : http://www.bigbrotherbot.com/forums/index.php?topic=423
 
 
@@ -18,10 +18,11 @@ Installation
  * copy plugin_chatlogger.xml into b3/extplugins/conf
  * create the chatlog table in your database importing the chatlogger.sql file.
  * update your main b3 config file with :
-<plugin name="chatlogger" priority="18" config="@b3/extplugins/conf/plugin_chatlogger.xml"/>
+<plugin name="chatlogger" config="@b3/extplugins/conf/plugin_chatlogger.xml"/>
 
 NOTE : if you are using the censor plugin, make sure the priority of the chatlogger plugin is less
 than the priority of the censor plugin or you won't log any messages containing censored words.
+
 
 Changelog
 ---------
@@ -48,3 +49,6 @@ Changelog
    
 11/04/2011 - 0.2.1 - Courgette
  - update the sql script to use the utf8 charset
+
+16/04/2011 - 1.0.0 - Courgette
+ - can log to a file instead of logging to db (or both) 
