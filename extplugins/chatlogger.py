@@ -38,6 +38,7 @@
 # - update the sql script to use the utf8 charset
 # 16/04/2011 - 1.0.0 - Courgette
 # - can log to a file instead of logging to db (or both) 
+# - requires B3 1.6+
 #
 
 __version__ = '1.0.0'
