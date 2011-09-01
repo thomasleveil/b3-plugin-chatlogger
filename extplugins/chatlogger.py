@@ -39,9 +39,11 @@
 # 16/04/2011 - 1.0.0 - Courgette
 # - can log to a file instead of logging to db (or both) 
 # - requires B3 1.6+
+# 01/09/2011 - 1.0.1 - BlackMamba
+# - log commands to db
 #
 
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 __author__  = 'Courgette'
 
 import b3, time, threading, re
@@ -61,6 +63,7 @@ class ChatloggerPlugin(b3.plugin.Plugin):
   _hours = None
   _minutes = None
   _db_table = None
+  _db_table_cmdlog = None
   _file_name = None
   _filelogger = None
   _save2db = None
@@ -146,6 +149,13 @@ class ChatloggerPlugin(b3.plugin.Plugin):
     except:
       self._db_table = 'chatlog'
       self.debug('Using default value (%s) for db_table', self._db_table) 
+
+    try:
+      self._db_table_cmdlog = self.config.get('database', 'db_table_cmdlog')
+      self.debug('Using table (%s) to store command log', self._db_table_cmdlog)
+    except:
+      self._db_table_cmdlog = 'cmdlog'
+      self.debug('Using default value (%s) for db_table_cmdlog', self._db_table_cmdlog) 
       
     try:
       max_age = self.config.get('purge', 'max_age')
@@ -220,9 +230,9 @@ class ChatloggerPlugin(b3.plugin.Plugin):
     self.registerEvent(b3.events.EVT_CLIENT_SAY)
     self.registerEvent(b3.events.EVT_CLIENT_TEAM_SAY)
     self.registerEvent(b3.events.EVT_CLIENT_PRIVATE_SAY)
+    self.registerEvent(b3.events.EVT_ADMIN_COMMAND)
 
 
-    
 
   def onEvent(self, event):
     """\
@@ -243,6 +253,10 @@ class ChatloggerPlugin(b3.plugin.Plugin):
       chat = PrivateChatData(self, event)
       chat._table = self._db_table
       chat.save()
+    if event.type == b3.events.EVT_ADMIN_COMMAND:
+      cmd = CmdData(self, event)
+      cmd._table = self._db_table_cmdlog
+      cmd.save()
  
   def purge(self):
     if not self._max_age_in_days or self._max_age_in_days == 0:
@@ -254,7 +268,61 @@ class ChatloggerPlugin(b3.plugin.Plugin):
     self.debug(q)
     cursor = self.console.storage.query(q)
     #self.debug('cursor : %s'%cursor)
+
+    self.info('purge of commands older than %s days ...'%self._max_age_in_days)
+    q = "DELETE FROM %s WHERE msg_time < %i"%(self._db_table_cmdlog, self.console.time() - (self._max_age_in_days*24*60*60))
+    self.debug(q)
+    cursor = self.console.storage.query(q)
     
+class CmdData(object):
+  #default name of the table for this data object
+  _table = 'cmdlog'
+  plugin = None
+
+  #fields of the table
+  admin_id = None
+  admin_name = None
+  command = None
+  data = None
+  result = None
+
+  def __init__(self, plugin, event):
+    self.plugin = plugin
+    self.admin_id = event.client.id
+    self.admin_name = event.client.name
+
+    self.command = event.data[0]
+    self.data = event.data[1]
+    self.result = event.data[2]
+    self.event = event
+
+  def _insertquery(self):
+      return """INSERT INTO {table_name}
+             (cmd_time, admin_id, admin_name, command, data, result)
+             VALUES (%(time)s, %(admin_id)s, %(admin_name)s, %(command)s, %(data)s, %(result)s) """.format(table_name=self._table)
+
+  def save(self):
+    self.plugin.debug("%s, %s, %s, %s, %s" % (self.admin_id, self.admin_name, self.command, self.data, self.result))
+    
+    if self.plugin._save2db:
+        self._save2db()
+
+  def _save2db(self):
+    self.plugin.debug("writing cmdlog to database")
+    q = self._insertquery()
+    data = {'time':self.plugin.console.time(), 
+     'admin_id': self.admin_id, 
+     'admin_name': self.admin_name, 
+     'command': self.command.command,
+     'data': self.data,
+     'result': self.result}
+
+    cursor = self.plugin.console.storage.query(q, data)
+    if (cursor.rowcount > 0):
+      self.plugin.debug("rowcount: %s, id:%s" % (cursor.rowcount, cursor.lastrowid))
+    else:
+      self.plugin.warning("inserting cmdlog failed")
+
     
 class ChatData(object):
   #default name of the table for this data object

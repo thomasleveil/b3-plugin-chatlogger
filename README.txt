@@ -53,3 +53,6 @@ Changelog
 16/04/2011 - 1.0.0 - Courgette
  - can log to a file instead of logging to db (or both)
  - requires B3 1.6+ 
+
+01/09/2011 - 1.0.1 - BlackMamba
+ - log commands to db
