@@ -7,7 +7,7 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
-
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -39,11 +39,13 @@
 # 16/04/2011 - 1.0.0 - Courgette
 # - can log to a file instead of logging to db (or both) 
 # - requires B3 1.6+
-# 01/09/2011 - 1.0.1 - BlackMamba
+# 01/09/2011 - 1.1.0 - BlackMamba
 # - log commands to db
-#
+# 01/09/2011 - 1.1.1 - Courgette
+# - refactoring to reduce code duplication
+# - better test coverage
 
-__version__ = '1.0.1'
+__version__ = '1.1.1'
 __author__  = 'Courgette'
 
 import b3, time, threading, re
@@ -273,21 +275,46 @@ class ChatloggerPlugin(b3.plugin.Plugin):
     q = "DELETE FROM %s WHERE msg_time < %i"%(self._db_table_cmdlog, self.console.time() - (self._max_age_in_days*24*60*60))
     self.debug(q)
     cursor = self.console.storage.query(q)
-    
-class CmdData(object):
-  #default name of the table for this data object
-  _table = 'cmdlog'
-  plugin = None
 
-  #fields of the table
-  admin_id = None
-  admin_name = None
-  command = None
-  data = None
-  result = None
+
+    
+class AbstractData(object):
+
+  def __init__(self, plugin):
+    #default name of the table for this data object
+    self._table = None
+    self.plugin = plugin
+
+  def _insertquery(self):
+      raise NotImplementedError
+
+  def save(self):
+      """should call self._save2db with correct parameters"""
+      raise NotImplementedError
+
+  def _save2db(self, data):
+    q = self._insertquery()
+    try:
+        cursor = self.plugin.console.storage.query(q, data)
+        if (cursor.rowcount > 0):
+          self.plugin.debug("rowcount: %s, id:%s" % (cursor.rowcount, cursor.lastrowid))
+        else:
+          self.plugin.warning("inserting into %s failed" % self._table)
+    except MySQLdb.ProgrammingError, e:
+        if e[0] == 1146:
+            self.plugin.error("Could not save to database : %s" % e[1])
+            self.plugin.info("Refer to this plugin readme file for instruction on how to create the required tables")
+        else:
+            self.plugin.error("Could not save to database : %s" % e)
+
+
+class CmdData(AbstractData):
 
   def __init__(self, plugin, event):
-    self.plugin = plugin
+    AbstractData.__init__(self, plugin)
+    #default name of the table for this data object
+    self._table = 'cmdlog'
+
     self.admin_id = event.client.id
     self.admin_name = event.client.name
 
@@ -303,31 +330,18 @@ class CmdData(object):
 
   def save(self):
     self.plugin.debug("%s, %s, %s, %s, %s" % (self.admin_id, self.admin_name, self.command, self.data, self.result))
-    
-    if self.plugin._save2db:
-        self._save2db()
-
-  def _save2db(self):
-    self.plugin.debug("writing cmdlog to database")
-    q = self._insertquery()
     data = {'time':self.plugin.console.time(), 
      'admin_id': self.admin_id, 
      'admin_name': self.admin_name, 
      'command': self.command.command,
      'data': self.data,
-     'result': self.result}
-
-    cursor = self.plugin.console.storage.query(q, data)
-    if (cursor.rowcount > 0):
-      self.plugin.debug("rowcount: %s, id:%s" % (cursor.rowcount, cursor.lastrowid))
-    else:
-      self.plugin.warning("inserting cmdlog failed")
+     'result': self.result
+     }
+    if self.plugin._save2db:
+        self._save2db(data)
 
     
-class ChatData(object):
-  #default name of the table for this data object
-  _table = 'chatlog'
-  plugin = None
+class ChatData(AbstractData):
   
   #fields of the table
   msg_type = 'ALL' # ALL, TEAM or PM
@@ -337,62 +351,53 @@ class ChatData(object):
   msg = None
   
   def __init__(self, plugin, event):
-    self.plugin = plugin
+    AbstractData.__init__(self, plugin)
+    #default name of the table for this data object
+    self._table = 'chatlog'
+
     self.client_id = event.client.id
     self.client_name = event.client.name
     self.client_team = event.client.team
     self.msg = event.data
+    self.target_id = None
+    self.target_name = None
+    self.target_team = None
     
   def _insertquery(self):
     return """INSERT INTO {table_name} 
-        (msg_time, msg_type, client_id, client_name, client_team, msg) 
-        VALUES (%(time)s, %(type)s, %(client_id)s, %(client_name)s, %(client_team)s, %(msg)s) """.format(table_name=self._table)
+        (msg_time, msg_type, client_id, client_name, client_team, msg, target_id, target_name, target_team) 
+        VALUES (%(time)s, %(type)s, %(client_id)s, %(client_name)s, %(client_team)s, %(msg)s, %(target_id)s, 
+        %(target_name)s, %(target_team)s )""".format(table_name=self._table)
         
   def save(self):
     self.plugin.debug("%s, %s, %s, %s"% (self.msg_type, self.client_id, self.client_name, self.msg))
-    
-    if self.plugin._save2file:
-        self._save2file()
-    if self.plugin._save2db:
-        self._save2db()
-
-  def _save2file(self):
-      self.plugin.debug("writing to file")
-      self.plugin._filelogger.info("@%s [%s] to %s:\t%s"% (self.client_id, self.client_name, self.msg_type, self.msg))
-        
-  def _save2db(self):
-    self.plugin.debug("writing to database")
-    q = self._insertquery()
     data = {'time':self.plugin.console.time(), 
      'type': self.msg_type, 
      'client_id': self.client_id, 
      'client_name': self.client_name, 
      'client_team': self.client_team,
-     'msg': self.msg}
-
-    cursor = self.plugin.console.storage.query(q, data)
-    if (cursor.rowcount > 0):
-      self.plugin.debug("rowcount: %s, id:%s" % (cursor.rowcount, cursor.lastrowid))
-    else:
-      self.plugin.warning("inserting chat failed")
-      
-      
+     'msg': self.msg,
+     'target_id': self.target_id, 
+     'target_name': self.target_name, 
+     'target_team': self.target_team,
+     }
     
+    if self.plugin._save2file:
+        self._save2file(data)
+    if self.plugin._save2db:
+        self._save2db(data)
+
+  def _save2file(self, data):
+      self.plugin.debug("writing to file")
+      self.plugin._filelogger.info("@%(client_id)s [%(client_name)s] to %(type)s:\t%(msg)s" % data)
+
+
 class TeamChatData(ChatData):
   msg_type = 'TEAM'
-  
-  def __init__(self, plugin, event):
-    ChatData.__init__(self, plugin, event)
-  
-  
   
   
 class PrivateChatData(ChatData):
   msg_type = 'PM'
-  
-  target_id = None
-  target_name = None
-  target_team = None
   
   def __init__(self, plugin, event):
     ChatData.__init__(self, plugin, event)
@@ -400,14 +405,51 @@ class PrivateChatData(ChatData):
     self.target_name = event.target.name
     self.target_team = event.target.team
     
-  def _insertquery(self):
-    return "INSERT INTO %s (msg_time, msg_type, client_id, client_name, client_team, msg, target_id, target_name, target_team) VALUES (%s, \"%s\", %s, \"%s\", %s, \"%s\", %s, \"%s\", %s)" % (self._table, self.plugin.console.time(), self.msg_type, self.client_id, self.client_name.replace('\\','\\\\').replace('"','\\"'), self.client_team, self.msg.replace('\\','\\\\').replace('"','\\"'), self.target_id, self.target_name.replace('\\','\\\\').replace('"','\\"'), self.target_team)
-  
+
 
 
 if __name__ == '__main__':
-        from b3.fake import fakeConsole, joe, simon
+        import MySQLdb
+        from b3.fake import FakeClient, fakeConsole, joe, simon
+        from b3.storage import DatabaseStorage
+
+        db = MySQLdb.connect(host='localhost', user='b3test', passwd='test')
+        db.query("DROP DATABASE IF EXISTS b3_test")
+        db.query("CREATE DATABASE b3_test CHARACTER SET utf8;")
         
+        fakeConsole.storage =  DatabaseStorage("mysql://b3test:test@localhost/b3_test", fakeConsole)
+        fakeConsole.storage.executeSql("@b3/sql/b3.sql")
+        fakeConsole.storage.query("""CREATE TABLE `chatlog` (
+          `id` int(11) unsigned NOT NULL auto_increment,
+          `msg_time` int(10) unsigned NOT NULL,
+          `msg_type` enum('ALL','TEAM','PM') NOT NULL,
+          `client_id` int(11) unsigned NOT NULL,
+          `client_name` varchar(32) NOT NULL,
+          `client_team` tinyint(1) NOT NULL,
+          `msg` varchar(528) NOT NULL,
+          `target_id` int(11) unsigned default NULL,
+          `target_name` varchar(32) default NULL,
+          `target_team` tinyint(1) default NULL,
+          PRIMARY KEY  (`id`),
+          KEY `client` (`client_id`)
+        ) ENGINE=MyISAM DEFAULT CHARSET=utf8;""")
+        fakeConsole.storage.query("""CREATE TABLE `cmdlog` (
+          `id` int(11) unsigned NOT NULL auto_increment,
+          `cmd_time` int(10) unsigned NOT NULL,
+          `admin_id` int(11) unsigned NOT NULL,
+          `admin_name` varchar(32) NOT NULL,
+          `command` varchar(100) NULL,
+          `data` varchar(528) default NULL,
+          `result` varchar(528) default NULL,
+          PRIMARY KEY (`id`),
+          KEY `client` (`admin_id`)
+        ) ENGINE=MyISAM DEFAULT CHARSET=utf8;""")
+
+        def sendsPM(self, msg, target):
+            print "\n%s PM to %s : \"%s\"" % (self.name, msg, target)
+            self.console.queueEvent(b3.events.Event(b3.events.EVT_CLIENT_PRIVATE_SAY, msg, self, target))
+        FakeClient.sendsPM = sendsPM
+
         conf1 = b3.config.XmlConfigParser()
         conf1.loadFromString("""
         <configuration plugin="chatlogger">
@@ -459,8 +501,9 @@ if __name__ == '__main__':
                 <!-- min between 0 and 59 -->
             </settings>
         </configuration>
-        """)  
+        """)
         p = ChatloggerPlugin(fakeConsole, conf1)
+        p.onLoadConfig()
         p.onStartup()
         
         joe.connects(1)
@@ -468,8 +511,10 @@ if __name__ == '__main__':
         
         while True:
             joe.says("hello")
-            time.sleep(5)
-            simon.says("hi")
-            time.sleep(5)
-            joe.says2team("team test")
+            time.sleep(2)
+            simon.says2team("team test")
+            time.sleep(2)
+            joe.sendsPM("PM test", simon)
+            time.sleep(2)
+            simon.says("!help test command")
             time.sleep(20)
