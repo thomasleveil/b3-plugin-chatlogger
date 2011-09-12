@@ -61,4 +61,7 @@ Changelog
  - refactoring to reduce code duplication
  - better test coverage
  - update authors credit
- 
+
+12/09/2011 - 1.1.2 - Courgette
+ - start without failure even if the plugin is loaded before the admin plugin
+ - do not fail to handle SQLite database errors

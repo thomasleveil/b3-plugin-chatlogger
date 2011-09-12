@@ -44,8 +44,11 @@
 # 01/09/2011 - 1.1.1 - Courgette
 # - refactoring to reduce code duplication
 # - better test coverage
+# 12/09/2011 - 1.1.2 - Courgette
+# - start without failure even if the plugin is loaded before the admin plugin
+# - do not fail to handle SQLite database errors
 
-__version__ = '1.1.1'
+__version__ = '1.1.2'
 __author__    = 'Courgette, xlr8or, BlackMamba'
 
 import b3, time, threading, re
@@ -229,10 +232,10 @@ class ChatloggerPlugin(b3.plugin.Plugin):
         """
         
         # listen for client events
-        self.registerEvent(b3.events.EVT_CLIENT_SAY)
-        self.registerEvent(b3.events.EVT_CLIENT_TEAM_SAY)
-        self.registerEvent(b3.events.EVT_CLIENT_PRIVATE_SAY)
-        self.registerEvent(b3.events.EVT_ADMIN_COMMAND)
+        self.registerEvent(self.console.getEventID('EVT_CLIENT_SAY'))
+        self.registerEvent(self.console.getEventID('EVT_CLIENT_TEAM_SAY'))
+        self.registerEvent(self.console.getEventID('EVT_CLIENT_PRIVATE_SAY'))
+        self.registerEvent(self.console.getEventID('EVT_ADMIN_COMMAND'))
 
 
 
@@ -300,12 +303,12 @@ class AbstractData(object):
                 self.plugin.debug("rowcount: %s, id:%s" % (cursor.rowcount, cursor.lastrowid))
             else:
                 self.plugin.warning("inserting into %s failed" % self._table)
-        except MySQLdb.ProgrammingError, e:
+        except Exception, e:
             if e[0] == 1146:
                 self.plugin.error("Could not save to database : %s" % e[1])
                 self.plugin.info("Refer to this plugin readme file for instruction on how to create the required tables")
             else:
-                self.plugin.error("Could not save to database : %s" % e)
+                raise e
 
 
 class CmdData(AbstractData):
