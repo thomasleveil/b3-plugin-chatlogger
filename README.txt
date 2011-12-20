@@ -65,3 +65,6 @@ Changelog
 12/09/2011 - 1.1.2 - Courgette
  - start without failure even if the plugin is loaded before the admin plugin
  - do not fail to handle SQLite database errors
+
+20/12/2011 - 1.1.3 - Courgette
+ - fixes #2 : Error DELETE FROM cmdlog WHERE msg_time (thanks to Mariodu62)

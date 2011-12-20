@@ -47,8 +47,10 @@
 # 12/09/2011 - 1.1.2 - Courgette
 # - start without failure even if the plugin is loaded before the admin plugin
 # - do not fail to handle SQLite database errors
-
-__version__ = '1.1.2'
+# 20/12/2011 - 1.1.3 - Courgette
+# - fixes #2 : Error DELETE FROM cmdlog WHERE msg_time (thanks to Mariodu62)
+#
+__version__ = '1.1.3'
 __author__    = 'Courgette, xlr8or, BlackMamba'
 
 import b3, time, threading, re
@@ -275,7 +277,7 @@ class ChatloggerPlugin(b3.plugin.Plugin):
         #self.debug('cursor : %s'%cursor)
 
         self.info('purge of commands older than %s days ...'%self._max_age_in_days)
-        q = "DELETE FROM %s WHERE msg_time < %i"%(self._db_table_cmdlog, self.console.time() - (self._max_age_in_days*24*60*60))
+        q = "DELETE FROM %s WHERE cmd_time < %i"%(self._db_table_cmdlog, self.console.time() - (self._max_age_in_days*24*60*60))
         self.debug(q)
         cursor = self.console.storage.query(q)
 
