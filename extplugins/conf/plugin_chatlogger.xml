@@ -39,6 +39,7 @@
 				1y : one year
 		-->
 		<set name="max_age">0</set>
+		<set name="max_age_cmd">0</set>
 
 		<!-- The purge action takes place once a day at the time define below.
 		Default time is midnight -->

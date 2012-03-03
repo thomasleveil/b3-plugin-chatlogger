@@ -170,7 +170,7 @@ class ChatloggerPlugin(b3.plugin.Plugin):
             days = 0
             self.debug('Using default value (%s) for max_age', days)
             
-        # convert max age string to days. (max age can be written as : 2d for 'two days', etc)
+# convert max age string to days. (max age can be written as : 2d for 'two days', etc)
         try:
             if max_age[-1:] == 'd':
                 days = int(max_age[:-1])
@@ -194,6 +194,36 @@ class ChatloggerPlugin(b3.plugin.Plugin):
         else:
             self._max_age_in_days = days
 
+        try:
+            max_age_cmd = self.config.get('purge', 'max_age_cmd')
+        except:
+            days_cmd = 0
+            self.debug('Using default value (%s) for max_age_cmd', days_cmd)
+            
+# convert max age string to days. (max age can be written as : 2d for 'two days', etc)
+        try:
+            if max_age_cmd[-1:] == 'd':
+                days_cmd = int(max_age_cmd[:-1])
+            elif max_age_cmd[-1:] == 'w':
+                days_cmd = int(max_age_cmd[:-1]) * 7
+            elif max_age_cmd[-1:] == 'm':
+                days_cmd = int(max_age_cmd[:-1]) * 30
+            elif max_age_cmd[-1:] == 'y':
+                days_cmd = int(max_age_cmd[:-1]) * 365
+            else:
+                days_cmd = int(max_age_cmd)
+        except ValueError:
+            self.error("Could not convert %s to a valid number of days."%max_age_cmd)
+            days_cmd = 0
+        
+        self.debug('max age cmd : %s => %s days'%(max_age_cmd, days_cmd))
+        
+        # force max age to be at least one day
+        if days_cmd != 0 and days_cmd < 1:
+            self._max_age_cmd_in_days = 1
+        else:
+            self._max_age_cmd_in_days = days_cmd
+
         
         try:
             self._hours = self.config.getint('purge', 'hour')
@@ -215,13 +245,14 @@ class ChatloggerPlugin(b3.plugin.Plugin):
             self._minutes = 0
             self.debug('Using default value (%s) for minutes', self._minutes)
         
-        if self._max_age_in_days != 0:
+        if (self._max_age_in_days != 0) or (self._max_age_cmd_in_days != 0):
             # Get time_zone from main B3 config
             tzName = self.console.config.get('b3', 'time_zone').upper()
             tzOffest = b3.timezones.timezones[tzName]
             hoursGMT = (self._hours - tzOffest)%24
             self.debug("%02d:%02d %s => %02d:%02d UTC" % (self._hours, self._minutes, tzName, hoursGMT, self._minutes))
             self.info('everyday at %2d:%2d %s, chat messages older than %s days will be deleted'%(self._hours, self._minutes, tzName, self._max_age_in_days))
+            self.info('everyday at %2d:%2d %s, chat commands older than %s days will be deleted'%(self._hours, self._minutes, tzName, self._max_age_cmd_in_days))
             self._cronTab = b3.cron.PluginCronTab(self, self.purge, 0, self._minutes, hoursGMT, '*', '*', '*')
             self.console.cron + self._cronTab
         else:
@@ -266,21 +297,22 @@ class ChatloggerPlugin(b3.plugin.Plugin):
             cmd.save()
  
     def purge(self):
-        if not self._max_age_in_days or self._max_age_in_days == 0:
+        if self._max_age_in_days and (self._max_age_in_days != 0):
+            self.info('purge of chat messages older than %s days ...'%self._max_age_in_days)
+            q = "DELETE FROM %s WHERE msg_time < %i"%(self._db_table, self.console.time() - (self._max_age_in_days*24*60*60)) 
+            self.debug(q)
+            cursor = self.console.storage.query(q)
+            #self.debug('cursor : %s'%cursor)
+        else:
             self.warning('max_age is invalid [%s]'%self._max_age_in_days)
-            return False
-            
-        self.info('purge of chat messages older than %s days ...'%self._max_age_in_days)
-        q = "DELETE FROM %s WHERE msg_time < %i"%(self._db_table, self.console.time() - (self._max_age_in_days*24*60*60)) 
-        self.debug(q)
-        cursor = self.console.storage.query(q)
-        #self.debug('cursor : %s'%cursor)
 
-        self.info('purge of commands older than %s days ...'%self._max_age_in_days)
-        q = "DELETE FROM %s WHERE cmd_time < %i"%(self._db_table_cmdlog, self.console.time() - (self._max_age_in_days*24*60*60))
-        self.debug(q)
-        cursor = self.console.storage.query(q)
-
+        if self._max_age_cmd_in_days and (self._max_age_cmd_in_days != 0):
+            self.info('purge of commands older than %s days ...'%self._max_age_cmd_in_days)
+            q = "DELETE FROM %s WHERE cmd_time < %i"%(self._db_table_cmdlog, self.console.time() - (self._max_age_cmd_in_days*24*60*60))
+            self.debug(q)
+            cursor = self.console.storage.query(q)
+        else:
+            self.warning('max_age_cmd is invalid [%s]'%self._max_age_cmd_in_days)
 
         
 class AbstractData(object):
