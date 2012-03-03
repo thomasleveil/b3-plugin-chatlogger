@@ -49,9 +49,11 @@
 # - do not fail to handle SQLite database errors
 # 20/12/2011 - 1.1.3 - Courgette
 # - fixes #2 : Error DELETE FROM cmdlog WHERE msg_time (thanks to Mariodu62)
+# 03/03/2012 - 1.2 - OliverWieland
+# - add new setting max_age_cmd
 #
-__version__ = '1.1.3'
-__author__    = 'Courgette, xlr8or, BlackMamba'
+__version__ = '1.2'
+__author__    = 'Courgette, xlr8or, BlackMamba, OliverWieland'
 
 import b3, time, threading, re
 import logging
