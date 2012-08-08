@@ -51,19 +51,18 @@
 # - fixes #2 : Error DELETE FROM cmdlog WHERE msg_time (thanks to Mariodu62)
 # 03/03/2012 - 1.2 - OliverWieland
 # - add new setting max_age_cmd
+# 09/08/2012 - 1.3 - Courgette
+# - now also log events EVT_CLIENT_RADIO, EVT_CLIENT_CALLVOTE and EVT_CLIENT_VOTE when available
 #
-__version__ = '1.2'
+__version__ = '1.3'
 __author__    = 'Courgette, xlr8or, BlackMamba, OliverWieland'
 
-import b3, time, threading, re
+import b3, time
 import logging
-from b3 import clients
 import b3.events
 import b3.plugin
 import b3.cron
 import b3.timezones
-import datetime, string
-from b3 import functions
 
 #--------------------------------------------------------------------------------------------------
 class ChatloggerPlugin(b3.plugin.Plugin):
@@ -169,26 +168,10 @@ class ChatloggerPlugin(b3.plugin.Plugin):
         try:
             max_age = self.config.get('purge', 'max_age')
         except:
-            days = 0
-            self.debug('Using default value (%s) for max_age', days)
-            
-# convert max age string to days. (max age can be written as : 2d for 'two days', etc)
-        try:
-            if max_age[-1:] == 'd':
-                days = int(max_age[:-1])
-            elif max_age[-1:] == 'w':
-                days = int(max_age[:-1]) * 7
-            elif max_age[-1:] == 'm':
-                days = int(max_age[:-1]) * 30
-            elif max_age[-1:] == 'y':
-                days = int(max_age[:-1]) * 365
-            else:
-                days = int(max_age)
-        except ValueError:
-            self.error("Could not convert %s to a valid number of days."%max_age)
-            days = 0
-        
-        self.debug('max age : %s => %s days'%(max_age, days))
+            max_age = 0
+            self.debug('Using default value (%s) for max_age', max_age)
+        days = self.string2days(max_age)
+        self.debug('max age : %s => %s days' % (max_age, days))
         
         # force max age to be at least one day
         if days != 0 and days < 1:
@@ -196,30 +179,15 @@ class ChatloggerPlugin(b3.plugin.Plugin):
         else:
             self._max_age_in_days = days
 
+
         try:
             max_age_cmd = self.config.get('purge', 'max_age_cmd')
         except:
-            days_cmd = 0
-            self.debug('Using default value (%s) for max_age_cmd', days_cmd)
-            
-# convert max age string to days. (max age can be written as : 2d for 'two days', etc)
-        try:
-            if max_age_cmd[-1:] == 'd':
-                days_cmd = int(max_age_cmd[:-1])
-            elif max_age_cmd[-1:] == 'w':
-                days_cmd = int(max_age_cmd[:-1]) * 7
-            elif max_age_cmd[-1:] == 'm':
-                days_cmd = int(max_age_cmd[:-1]) * 30
-            elif max_age_cmd[-1:] == 'y':
-                days_cmd = int(max_age_cmd[:-1]) * 365
-            else:
-                days_cmd = int(max_age_cmd)
-        except ValueError:
-            self.error("Could not convert %s to a valid number of days."%max_age_cmd)
-            days_cmd = 0
-        
+            max_age_cmd = 0
+            self.debug('Using default value (%s) for max_age_cmd', max_age_cmd)
+        days_cmd = self.string2days(max_age_cmd)
         self.debug('max age cmd : %s => %s days'%(max_age_cmd, days_cmd))
-        
+
         # force max age to be at least one day
         if days_cmd != 0 and days_cmd < 1:
             self._max_age_cmd_in_days = 1
@@ -272,13 +240,25 @@ class ChatloggerPlugin(b3.plugin.Plugin):
         self.registerEvent(self.console.getEventID('EVT_CLIENT_PRIVATE_SAY'))
         self.registerEvent(self.console.getEventID('EVT_ADMIN_COMMAND'))
 
+        self.EVT_CLIENT_RADIO = self.console.getEventID('EVT_CLIENT_RADIO')
+        if self.EVT_CLIENT_RADIO:
+            self.registerEvent(self.EVT_CLIENT_RADIO)
+
+        self.EVT_CLIENT_CALLVOTE = self.console.getEventID('EVT_CLIENT_CALLVOTE')
+        if self.EVT_CLIENT_CALLVOTE:
+            self.registerEvent(self.EVT_CLIENT_CALLVOTE)
+
+        self.EVT_CLIENT_VOTE = self.console.getEventID('EVT_CLIENT_VOTE')
+        if self.EVT_CLIENT_VOTE:
+            self.registerEvent(self.EVT_CLIENT_VOTE)
+
 
 
     def onEvent(self, event):
         """\
         Handle intercepted events
         """
-        if not event.client or event.client.cid == None or len(event.data) <= 0:
+        if not event.client or event.client.cid is None or len(event.data) <= 0:
             return
         
         if event.type == b3.events.EVT_CLIENT_SAY:
@@ -297,6 +277,18 @@ class ChatloggerPlugin(b3.plugin.Plugin):
             cmd = CmdData(self, event)
             cmd._table = self._db_table_cmdlog
             cmd.save()
+        if self.EVT_CLIENT_RADIO and event.type == self.EVT_CLIENT_RADIO:
+            data = ClientRadioData(self, event)
+            data._table = self._db_table
+            data.save()
+        if self.EVT_CLIENT_CALLVOTE and event.type == self.EVT_CLIENT_CALLVOTE:
+            data = ClientCallVoteData(self, event)
+            data._table = self._db_table
+            data.save()
+        if self.EVT_CLIENT_VOTE and event.type == self.EVT_CLIENT_VOTE:
+            data = ClientVoteData(self, event)
+            data._table = self._db_table
+            data.save()
  
     def purge(self):
         if self._max_age_in_days and (self._max_age_in_days != 0):
@@ -315,6 +307,26 @@ class ChatloggerPlugin(b3.plugin.Plugin):
             cursor = self.console.storage.query(q)
         else:
             self.warning('max_age_cmd is invalid [%s]'%self._max_age_cmd_in_days)
+
+
+    def string2days(self, text):
+        """ convert max age string to days. (max age can be written as : 2d for 'two days', etc) """
+        try:
+            if text[-1:] == 'd':
+                days = int(text[:-1])
+            elif text[-1:] == 'w':
+                days = int(text[:-1]) * 7
+            elif text[-1:] == 'm':
+                days = int(text[:-1]) * 30
+            elif text[-1:] == 'y':
+                days = int(text[:-1]) * 365
+            else:
+                days = int(text)
+        except ValueError:
+            self.error("Could not convert '%s' to a valid number of days." % text)
+            days = 0
+        return days
+
 
         
 class AbstractData(object):
@@ -335,7 +347,7 @@ class AbstractData(object):
         q = self._insertquery()
         try:
             cursor = self.plugin.console.storage.query(q, data)
-            if (cursor.rowcount > 0):
+            if cursor.rowcount > 0:
                 self.plugin.debug("rowcount: %s, id:%s" % (cursor.rowcount, cursor.lastrowid))
             else:
                 self.plugin.warning("inserting into %s failed" % self._table)
@@ -443,8 +455,23 @@ class PrivateChatData(ChatData):
         self.target_id = event.target.id
         self.target_name = event.target.name
         self.target_team = event.target.team
-        
 
+
+class ClientRadioData(TeamChatData):
+    def __init__(self, plugin, event):
+        TeamChatData.__init__(self, plugin, event)
+        self.msg = 'RADIO %s %s (%s) %s' % (event.data['msg_group'], event.data['msg_id'], event.data['location'],event.data['text'])
+
+
+class ClientCallVoteData(ChatData):
+    def __init__(self, plugin, event):
+        ChatData.__init__(self, plugin, event)
+        self.msg = 'CALL_VOTE %s' % event.data
+
+class ClientVoteData(ChatData):
+    def __init__(self, plugin, event):
+        ChatData.__init__(self, plugin, event)
+        self.msg = 'VOTE %s' % event.data
 
 
 if __name__ == '__main__':
