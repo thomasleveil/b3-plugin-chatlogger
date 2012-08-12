@@ -53,8 +53,10 @@
 # - add new setting max_age_cmd
 # 09/08/2012 - 1.3 - Courgette
 # - now also log events EVT_CLIENT_RADIO, EVT_CLIENT_CALLVOTE and EVT_CLIENT_VOTE when available
+# 12/08/2012 - 1.3.1 - Courgette
+# - gracefully fallback on default values when part of the config is missing
 #
-__version__ = '1.3'
+__version__ = '1.3.1'
 __author__    = 'Courgette, xlr8or, BlackMamba, OliverWieland'
 
 import b3, time
@@ -119,7 +121,7 @@ class ChatloggerPlugin(b3.plugin.Plugin):
             self._file_name = self.config.getpath('file', 'logfile')
             self.info('Using file (%s) to store log', self._file_name)
         except Exception, e:
-            self.error('error while reading logfile name. disabling logging to file')
+            self.error('error while reading logfile name. disabling logging to file. (%s)' % e)
             self._save2file = False
             return
         
@@ -147,7 +149,7 @@ class ChatloggerPlugin(b3.plugin.Plugin):
             self._filelogger.setLevel(logging.INFO)
         except Exception, e:
             self._save2file = False
-            self.error("cannot setup file chat logger. disabling logging to file (%s)", e)
+            self.error("cannot setup file chat logger. disabling logging to file (%s)" % e, exc_info=e)
     
     
     def loadConfig_database(self):
@@ -168,7 +170,7 @@ class ChatloggerPlugin(b3.plugin.Plugin):
         try:
             max_age = self.config.get('purge', 'max_age')
         except:
-            max_age = 0
+            max_age = "0d"
             self.debug('Using default value (%s) for max_age', max_age)
         days = self.string2days(max_age)
         self.debug('max age : %s => %s days' % (max_age, days))
@@ -183,7 +185,7 @@ class ChatloggerPlugin(b3.plugin.Plugin):
         try:
             max_age_cmd = self.config.get('purge', 'max_age_cmd')
         except:
-            max_age_cmd = 0
+            max_age_cmd = "0d"
             self.debug('Using default value (%s) for max_age_cmd', max_age_cmd)
         days_cmd = self.string2days(max_age_cmd)
         self.debug('max age cmd : %s => %s days'%(max_age_cmd, days_cmd))
@@ -312,18 +314,18 @@ class ChatloggerPlugin(b3.plugin.Plugin):
     def string2days(self, text):
         """ convert max age string to days. (max age can be written as : 2d for 'two days', etc) """
         try:
-            if text[-1:] == 'd':
+            if text[-1:].lower() == 'd':
                 days = int(text[:-1])
-            elif text[-1:] == 'w':
+            elif text[-1:].lower() == 'w':
                 days = int(text[:-1]) * 7
-            elif text[-1:] == 'm':
+            elif text[-1:].lower() == 'm':
                 days = int(text[:-1]) * 30
-            elif text[-1:] == 'y':
+            elif text[-1:].lower() == 'y':
                 days = int(text[:-1]) * 365
             else:
                 days = int(text)
-        except ValueError:
-            self.error("Could not convert '%s' to a valid number of days." % text)
+        except ValueError, e:
+            self.error("Could not convert '%s' to a valid number of days. (%s)" % (text, e))
             days = 0
         return days
 

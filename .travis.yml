@@ -1,0 +1,11 @@
+# TravisCI config file. See http://travis-ci.org
+language: python
+python:
+  - 2.6
+  - 2.7
+# command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
+install:
+  - pip install unittest2 --use-mirrors
+  - pip install -e git+git://github.com/courgette/big-brother-bot.git#egg=b3 --use-mirrors
+# command to run tests, e.g. python setup.py test
+script: PYTHONPATH=extplugins nosetests --where=tests
