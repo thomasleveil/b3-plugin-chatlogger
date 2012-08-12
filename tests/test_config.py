@@ -2,6 +2,7 @@ import logging
 import unittest
 from mock import Mock
 from mockito import when
+import sys
 
 import b3
 from chatlogger import ChatloggerPlugin
@@ -52,7 +53,8 @@ class Test_Config(B3TestCase):
         self.init()
         self.assertTrue(self.p._save2db)
         self.assertTrue(self.p._save2file)
-        self.assertEqual('c:\\b3_conf_folder\\chat.log', self.p._file_name)
+        expected_log_file = 'c:\\b3_conf_folder\\chat.log' if sys.platform == 'win32' else 'c:\\b3_conf_folder/chat.log'
+        self.assertEqual(expected_log_file, self.p._file_name)
         self.assertEqual("D", self.p._file_rotation_rate)
         self.assertEqual(0, self.p._max_age_in_days)
         self.assertEqual(0, self.p._max_age_cmd_in_days)
