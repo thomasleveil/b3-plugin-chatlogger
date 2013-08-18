@@ -5,6 +5,7 @@ import re
 import codecs
 from tempfile import mkdtemp
 from textwrap import dedent
+import unittest
 from mockito import when
 from chatlogger import ChatloggerPlugin
 from b3 import TEAM_RED, TEAM_BLUE
@@ -96,6 +97,7 @@ class Test_chatlogfile(B3TestCase):
         self.assertEqual(1, self.count_chatlog_lines())
         self.assert_log_line(self.get_all_chatlog_lines_from_logfile()[0], "@1 [Joe] to TEAM:\thello")
 
+    @unittest.skipUnless(hasattr(FakeClient, "says2squad"), "FakeClient.says2squad not available in this version of B3")
     def test_squad_chat(self):
         # WHEN
         self.joe.says2squad("hi")
