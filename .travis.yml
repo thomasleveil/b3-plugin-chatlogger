@@ -8,12 +8,16 @@ python:
 before_script:
   - mysql -e 'create database b3_test;'
 
-env: MYSQL_TEST_HOST=127.0.0.1 MYSQL_TEST_USER=travis MYSQL_TEST_PASSWORD='' MYSQL_TEST_DB=b3_test
+env:
+  global: MYSQL_TEST_HOST=127.0.0.1 MYSQL_TEST_USER=travis MYSQL_TEST_PASSWORD='' MYSQL_TEST_DB=b3_test
+  matrix:
+    - B3_REPO='git+git://github.com/thomasleveil/big-brother-bot.git@master#egg=b3'
+    - B3_REPO='git+git://github.com/thomasleveil/big-brother-bot.git@release-1.10#egg=b3'
 
 # command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 install:
   - pip install unittest2 mockito mock mysql-python --use-mirrors
-  - pip install -e git+git://github.com/thomasleveil/big-brother-bot.git#egg=b3 --use-mirrors
+  - pip install -e ${B3_REPO} --use-mirrors
 
 # command to run tests, e.g. python setup.py test
 script: PYTHONPATH=extplugins nosetests --where=tests --verbosity=3
