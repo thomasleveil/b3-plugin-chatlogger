@@ -1,39 +1,36 @@
 import logging
 import unittest
+import sys
+import os
+from textwrap import dedent
 from mock import Mock
 from mockito import when
-import sys
 
 import b3
 from chatlogger import ChatloggerPlugin
-from b3.config import XmlConfigParser
-
-from tests import B3TestCase
+from b3.config import CfgConfigParser
+from tests import B3TestCase, logging_disabled
 from chatlogger import __file__ as chatlogger__file__
-import os
 
-CHATLOGGER_CONFIG_FILE = os.path.join(os.path.dirname(chatlogger__file__), 'conf/plugin_chatlogger.xml')
+
+CHATLOGGER_CONFIG_FILE = os.path.join(os.path.dirname(chatlogger__file__), 'conf/plugin_chatlogger.ini')
 
 
 class Test_Config(B3TestCase):
-
     def setUp(self):
-        self.log = logging.getLogger('output')
-        self.log.propagate = False
-
         B3TestCase.setUp(self)
-        self.console.startup()
-        self.log.propagate = True
-        self.log.setLevel(logging.DEBUG)
+        with logging_disabled():
+            self.console.startup()
 
-        self.conf = XmlConfigParser()
+        logging.getLogger('output').setLevel(logging.DEBUG)
+
+        self.conf = CfgConfigParser()
         self.p = ChatloggerPlugin(self.console, self.conf)
 
         when(self.console.config).get('b3', 'time_zone').thenReturn('GMT')
         when(b3).getB3Path().thenReturn("c:\\b3_folder")
         when(b3).getConfPath().thenReturn("c:\\b3_conf_folder")
         self.p.setup_fileLogger = Mock()
-
 
     def init(self, config_content=None):
         """ load plugin config and initialise the plugin """
@@ -48,7 +45,6 @@ class Test_Config(B3TestCase):
         self.p.onLoadConfig()
         self.p.onStartup()
 
-
     def test_default_config(self):
         self.init()
         self.assertTrue(self.p._save2db)
@@ -61,9 +57,9 @@ class Test_Config(B3TestCase):
         self.assertEqual(0, self.p._hours)
         self.assertEqual(0, self.p._minutes)
 
-
     def test_empty_config(self):
-        self.init("""<configuration plugin="chatlogger" />""")
+        self.init("""
+        """)
         self.assertTrue(self.p._save2db)
         self.assertFalse(self.p._save2file)
         self.assertIsNone(self.p._file_name)
@@ -73,17 +69,13 @@ class Test_Config(B3TestCase):
         self.assertEqual(0, self.p._hours)
         self.assertEqual(0, self.p._minutes)
 
-
     def test_conf1(self):
-        self.init("""
-            <configuration plugin="chatlogger">
-                <settings name="purge">
-                    <set name="max_age">7d</set>
-                    <set name="hour">4</set>
-                    <set name="min">0</set>
-                </settings>
-            </configuration>
-        """)
+        self.init(dedent("""
+            [purge]
+            max_age:7d
+            hour:4
+            min:0
+        """))
         self.assertTrue(self.p._save2db)
         self.assertFalse(self.p._save2file)
         self.assertIsNone(self.p._file_name)
