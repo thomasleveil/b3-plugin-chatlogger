@@ -55,7 +55,6 @@ with logging_disabled():
     from b3.fake import FakeClient
 
     def sendsPM(self, msg, target):
-        print "\n%s PM to %s : \"%s\"" % (self.name, msg, target)
         self.console.queueEvent(b3.events.Event(b3.events.EVT_CLIENT_PRIVATE_SAY, msg, self, target))
 
     FakeClient.sendsPM = sendsPM
