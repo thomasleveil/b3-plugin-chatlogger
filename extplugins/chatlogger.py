@@ -63,10 +63,6 @@ import time
 import logging
 
 import b3
-import b3.events
-import b3.plugin
-import b3.cron
-import b3.timezones
 
 
 #--------------------------------------------------------------------------------------------------
@@ -229,9 +225,9 @@ class ChatloggerPlugin(b3.plugin.Plugin):
             hoursGMT = (self._hours - tzOffest) % 24
             self.debug("%02d:%02d %s => %02d:%02d UTC" % (self._hours, self._minutes, tzName, hoursGMT, self._minutes))
             self.info('everyday at %2d:%2d %s, chat messages older than %s days will be deleted' % (
-            self._hours, self._minutes, tzName, self._max_age_in_days))
+                self._hours, self._minutes, tzName, self._max_age_in_days))
             self.info('everyday at %2d:%2d %s, chat commands older than %s days will be deleted' % (
-            self._hours, self._minutes, tzName, self._max_age_cmd_in_days))
+                self._hours, self._minutes, tzName, self._max_age_cmd_in_days))
             self._cronTab = b3.cron.PluginCronTab(self, self.purge, 0, self._minutes, hoursGMT, '*', '*', '*')
             self.console.cron + self._cronTab
         else:
@@ -302,19 +298,18 @@ class ChatloggerPlugin(b3.plugin.Plugin):
         if self._max_age_in_days and (self._max_age_in_days != 0):
             self.info('purge of chat messages older than %s days ...' % self._max_age_in_days)
             q = "DELETE FROM %s WHERE msg_time < %i" % (
-            self._db_table, self.console.time() - (self._max_age_in_days * 24 * 60 * 60))
+                self._db_table, self.console.time() - (self._max_age_in_days * 24 * 60 * 60))
             self.debug(q)
-            cursor = self.console.storage.query(q)
-            #self.debug('cursor : %s'%cursor)
+            self.console.storage.query(q)
         else:
             self.warning('max_age is invalid [%s]' % self._max_age_in_days)
 
         if self._max_age_cmd_in_days and (self._max_age_cmd_in_days != 0):
             self.info('purge of commands older than %s days ...' % self._max_age_cmd_in_days)
             q = "DELETE FROM %s WHERE cmd_time < %i" % (
-            self._db_table_cmdlog, self.console.time() - (self._max_age_cmd_in_days * 24 * 60 * 60))
+                self._db_table_cmdlog, self.console.time() - (self._max_age_cmd_in_days * 24 * 60 * 60))
             self.debug(q)
-            cursor = self.console.storage.query(q)
+            self.console.storage.query(q)
         else:
             self.warning('max_age_cmd is invalid [%s]' % self._max_age_cmd_in_days)
 
@@ -469,7 +464,7 @@ class ClientRadioData(TeamChatData):
     def __init__(self, plugin, event):
         TeamChatData.__init__(self, plugin, event)
         self.msg = 'RADIO %s %s (%s) %s' % (
-        event.data['msg_group'], event.data['msg_id'], event.data['location'], event.data['text'])
+            event.data['msg_group'], event.data['msg_id'], event.data['location'], event.data['text'])
 
 
 class ClientCallVoteData(ChatData):
