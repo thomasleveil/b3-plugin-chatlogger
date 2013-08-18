@@ -173,7 +173,7 @@ class Test_mysql(B3TestCase):
                               'target_team': None},
                              self.get_all_chatlog_lines_from_db()[0])
 
-    @unittest.skipUnless(hasattr(FakeClient, "says2squad"), "FakeClient.says2squad not available in this version of B3")
+    @unittest.skipIf(not hasattr(FakeClient, "says2squad"), "FakeClient.says2squad not available in this version of B3")
     def test_squad_chat_gets_saved_to_db(self):
         # WHEN
         self.joe.says2squad("hi")

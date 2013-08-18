@@ -96,7 +96,7 @@ class Test_chatlogfile(B3TestCase):
         self.assertEqual(1, self.count_chatlog_lines())
         self.assert_log_line(self.get_all_chatlog_lines_from_logfile()[0], "@1 [Joe] to TEAM:\thello")
 
-    @unittest.skipUnless(hasattr(FakeClient, "says2squad"), "FakeClient.says2squad not available in this version of B3")
+    @unittest.skipIf(not hasattr(FakeClient, "says2squad"), "FakeClient.says2squad not available in this version of B3")
     def test_squad_chat(self):
         # WHEN
         self.joe.says2squad("hi")
