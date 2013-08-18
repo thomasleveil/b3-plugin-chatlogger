@@ -16,5 +16,5 @@ install:
   - pip install -e git+git://github.com/thomasleveil/big-brother-bot.git#egg=b3 --use-mirrors
 
 # command to run tests, e.g. python setup.py test
-script: PYTHONPATH=extplugins nosetests --where=tests
+script: PYTHONPATH=extplugins nosetests --where=tests --verbosity=3
 
