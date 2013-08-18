@@ -2,7 +2,7 @@
 import logging
 import os
 from textwrap import dedent
-import unittest
+import unittest2 as unittest
 from mock import Mock
 from mockito import when
 from chatlogger import ChatloggerPlugin
@@ -15,14 +15,17 @@ from tests import B3TestCase, logging_disabled
 
 
 """
-    NOTE: to work properly you must be running a MySQL database on localhost
-    which must have a user named 'b3test' with password 'test' which has
-    all privileges over a table (already created or not) named 'b3_test'
+    NOTE: you can customize the MySQL host, database and credential using the following
+    environment variables :
+        MYSQL_TEST_HOST
+        MYSQL_TEST_USER
+        MYSQL_TEST_PASSWORD
+        MYSQL_TEST_DB
 """
-MYSQL_HOST = 'localhost'
-MYSQL_USER = 'b3test'
-MYSQL_PASSWORD = 'test'
-MYSQL_DB = 'b3_test'
+MYSQL_TEST_HOST = os.environ.get('MYSQL_TEST_HOST', 'localhost')
+MYSQL_TEST_USER = os.environ.get('MYSQL_TEST_USER', 'b3test')
+MYSQL_TEST_PASSWORD = os.environ.get('MYSQL_TEST_PASSWORD', 'test')
+MYSQL_TEST_DB = os.environ.get('MYSQL_TEST_DB', 'b3_test')
 
 #===============================================================================
 #
@@ -40,7 +43,7 @@ except ImportError:
     no_mysql_reason = "no MySQLdb module available"
 else:
     try:
-        MySQLdb.connect(host=MYSQL_HOST, user=MYSQL_USER, passwd=MYSQL_PASSWORD)
+        MySQLdb.connect(host=MYSQL_TEST_HOST, user=MYSQL_TEST_USER, passwd=MYSQL_TEST_PASSWORD)
     except MySQLdb.Error, err:
         is_mysql_ready = False
         no_mysql_reason = "%s" % err[1]
@@ -60,7 +63,7 @@ with logging_disabled():
     FakeClient.sendsPM = sendsPM
 
 
-@unittest.skipIf(not is_mysql_ready, no_mysql_reason)
+@unittest.skipUnless(is_mysql_ready, no_mysql_reason)
 class Test_mysql(B3TestCase):
     def setUp(self):
         B3TestCase.setUp(self)
@@ -71,12 +74,12 @@ class Test_mysql(B3TestCase):
             self.p = ChatloggerPlugin(self.console, self.conf)
 
         ## prepare the mysql test database
-        db = MySQLdb.connect(host=MYSQL_HOST, user=MYSQL_USER, passwd=MYSQL_PASSWORD)
-        db.query("DROP DATABASE IF EXISTS %s" % MYSQL_DB)
-        db.query("CREATE DATABASE %s CHARACTER SET utf8;" % MYSQL_DB)
+        db = MySQLdb.connect(host=MYSQL_TEST_HOST, user=MYSQL_TEST_USER, passwd=MYSQL_TEST_PASSWORD)
+        db.query("DROP DATABASE IF EXISTS %s" % MYSQL_TEST_DB)
+        db.query("CREATE DATABASE %s CHARACTER SET utf8;" % MYSQL_TEST_DB)
 
         self.console.storage = DatabaseStorage(
-            'mysql://%s:%s@%s/%s' % (MYSQL_USER, MYSQL_PASSWORD, MYSQL_HOST, MYSQL_DB), self.console)
+            'mysql://%s:%s@%s/%s' % (MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, MYSQL_TEST_HOST, MYSQL_TEST_DB), self.console)
         self.console.storage.executeSql("@b3/sql/b3.sql")
         self.console.storage.executeSql(CHATLOGGER_SQL_FILE)
 
@@ -173,7 +176,7 @@ class Test_mysql(B3TestCase):
                               'target_team': None},
                              self.get_all_chatlog_lines_from_db()[0])
 
-    @unittest.skipIf(not hasattr(FakeClient, "says2squad"), "FakeClient.says2squad not available in this version of B3")
+    @unittest.skipUnless(hasattr(FakeClient, "says2squad"), "FakeClient.says2squad not available in this version of B3")
     def test_squad_chat_gets_saved_to_db(self):
         # WHEN
         self.joe.says2squad("hi")
