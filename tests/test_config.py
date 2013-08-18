@@ -28,8 +28,6 @@ class Test_Config(B3TestCase):
         self.p = ChatloggerPlugin(self.console, self.conf)
 
         when(self.console.config).get('b3', 'time_zone').thenReturn('GMT')
-        when(b3).getB3Path().thenReturn("c:\\b3_folder")
-        when(b3).getConfPath().thenReturn("c:\\b3_conf_folder")
         self.p.setup_fileLogger = Mock()
 
     def init(self, config_content=None):
@@ -46,7 +44,12 @@ class Test_Config(B3TestCase):
         self.p.onStartup()
 
     def test_default_config(self):
+        # GIVEN
+        when(b3).getB3Path().thenReturn("c:\\b3_folder")
+        when(b3).getConfPath().thenReturn("c:\\b3_conf_folder")
+        # WHEN
         self.init()
+        # THEN
         self.assertTrue(self.p._save2db)
         self.assertTrue(self.p._save2file)
         expected_log_file = 'c:\\b3_conf_folder\\chat.log' if sys.platform == 'win32' else 'c:\\b3_conf_folder/chat.log'

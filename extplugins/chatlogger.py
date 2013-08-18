@@ -17,56 +17,22 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #
-# Changelog:
+# Changelog: see README.md file
 #
-# 28/07/2008 - 0.0.1
-# - manage say, teamsay and privatesay messages
-# 14/08/2008 - 0.1.0
-# - fix security issue with player names of messages containing double quote or antislash characters (Thx to Anubis for report and tests)
-# - allows to setup a daily purge of old messages to keep your database size reasonable
-# 13/09/2008 - 0.1.1
-# - in config, the hour defined for the purge is now understood in the timezone defined in the main B3 config file (before, was understood as UTC time)
-# - fix mistake in log text
-# 7/11/2008 - 0.1.2 - xlr8or
-# - added missing 'import b3.timezones'
-# 22/12/2008 - 0.2.0 - Courgette
-# - allow to use a customized table name for storing the
-#   log to database. Usefull if multiple instances of the
-#   bot share the same database.
-#   Thanks to Eire.32 for bringing up the idea and testing.
-# 11/04/2011 - 0.2.1 - Courgette
-# - update the sql script to use the utf8 charset
-# 16/04/2011 - 1.0.0 - Courgette
-# - can log to a file instead of logging to db (or both)
-# - requires B3 1.6+
-# 01/09/2011 - 1.1.0 - BlackMamba
-# - log commands to db
-# 01/09/2011 - 1.1.1 - Courgette
-# - refactoring to reduce code duplication
-# - better test coverage
-# 12/09/2011 - 1.1.2 - Courgette
-# - start without failure even if the plugin is loaded before the admin plugin
-# - do not fail to handle SQLite database errors
-# 20/12/2011 - 1.1.3 - Courgette
-# - fixes #2 : Error DELETE FROM cmdlog WHERE msg_time (thanks to Mariodu62)
-# 03/03/2012 - 1.2 - OliverWieland
-# - add new setting max_age_cmd
-# 09/08/2012 - 1.3 - Courgette
-# - now also log events EVT_CLIENT_RADIO, EVT_CLIENT_CALLVOTE and EVT_CLIENT_VOTE when available
-# 12/08/2012 - 1.3.1 - Courgette
-# - gracefully fallback on default values when part of the config is missing
-#
-__version__ = '1.3.1'
-__author__ = 'Courgette, xlr8or, BlackMamba, OliverWieland'
-
 import time
 import logging
 
-import b3
+from cron import PluginCronTab
+from b3.plugin import Plugin
+from b3.config import ConfigParser
+import b3.events
+from b3.timezones import timezones
+
+__version__ = '1.3.2'
+__author__ = 'Courgette, xlr8or, BlackMamba, OliverWieland'
 
 
-#--------------------------------------------------------------------------------------------------
-class ChatloggerPlugin(b3.plugin.Plugin):
+class ChatloggerPlugin(Plugin):
     _cronTab = None
     _max_age_in_days = None
     _hours = None
@@ -79,7 +45,6 @@ class ChatloggerPlugin(b3.plugin.Plugin):
     _save2file = None
     _file_rotation_rate = None
 
-
     def onLoadConfig(self):
         # remove eventual existing crontab
         if self._cronTab:
@@ -88,7 +53,7 @@ class ChatloggerPlugin(b3.plugin.Plugin):
         try:
             self._save2db = self.config.getboolean('general', 'save_to_database')
             self.debug('save chat to database : %s', 'enabled' if self._save2db else 'disabled')
-        except b3.config.ConfigParser.NoOptionError:
+        except ConfigParser.NoOptionError:
             self._save2db = True
             self.info("Using default value '%s' for save_to_database", self._save2db)
         except ValueError, err:
@@ -99,7 +64,7 @@ class ChatloggerPlugin(b3.plugin.Plugin):
         try:
             self._save2file = self.config.getboolean('general', 'save_to_file')
             self.debug('save chat to file : %s', 'enabled' if self._save2file else 'disabled')
-        except b3.config.ConfigParser.NoOptionError:
+        except ConfigParser.NoOptionError:
             self._save2file = False
             self.info("Using default value '%s' for save_to_file", self._save2file)
         except ValueError, err:
@@ -116,7 +81,6 @@ class ChatloggerPlugin(b3.plugin.Plugin):
         if self._save2file:
             self.loadConfig_file()
 
-
     def loadConfig_file(self):
         try:
             self._file_name = self.config.getpath('file', 'logfile')
@@ -131,7 +95,7 @@ class ChatloggerPlugin(b3.plugin.Plugin):
             if self._file_rotation_rate.upper() not in ('H', 'D', 'W0', 'W1', 'W2', 'W3', 'W4', 'W5', 'W6'):
                 raise ValueError, 'Invalid rate specified: %s' % self._file_rotation_rate
             self.info("Using value '%s' for the file rotation rate", self._file_rotation_rate)
-        except b3.config.ConfigParser.NoOptionError:
+        except ConfigParser.NoOptionError:
             self._file_rotation_rate = 'D'
             self.info("Using default value '%s' for the file rotation rate", self._file_rotation_rate)
         except ValueError, e:
@@ -140,7 +104,6 @@ class ChatloggerPlugin(b3.plugin.Plugin):
                          self._file_rotation_rate, e)
 
         self.setup_fileLogger()
-
 
     def setup_fileLogger(self):
         try:
@@ -153,7 +116,6 @@ class ChatloggerPlugin(b3.plugin.Plugin):
         except Exception, e:
             self._save2file = False
             self.error("cannot setup file chat logger. disabling logging to file (%s)" % e, exc_info=e)
-
 
     def loadConfig_database(self):
         try:
@@ -221,18 +183,17 @@ class ChatloggerPlugin(b3.plugin.Plugin):
         if (self._max_age_in_days != 0) or (self._max_age_cmd_in_days != 0):
             # Get time_zone from main B3 config
             tzName = self.console.config.get('b3', 'time_zone').upper()
-            tzOffest = b3.timezones.timezones[tzName]
+            tzOffest = timezones[tzName]
             hoursGMT = (self._hours - tzOffest) % 24
             self.debug("%02d:%02d %s => %02d:%02d UTC" % (self._hours, self._minutes, tzName, hoursGMT, self._minutes))
             self.info('everyday at %2d:%2d %s, chat messages older than %s days will be deleted' % (
                 self._hours, self._minutes, tzName, self._max_age_in_days))
             self.info('everyday at %2d:%2d %s, chat commands older than %s days will be deleted' % (
                 self._hours, self._minutes, tzName, self._max_age_cmd_in_days))
-            self._cronTab = b3.cron.PluginCronTab(self, self.purge, 0, self._minutes, hoursGMT, '*', '*', '*')
+            self._cronTab = PluginCronTab(self, self.purge, 0, self._minutes, hoursGMT, '*', '*', '*')
             self.console.cron + self._cronTab
         else:
             self.info("chat log messages are kept forever")
-
 
     def startup(self):
         """\
@@ -256,7 +217,6 @@ class ChatloggerPlugin(b3.plugin.Plugin):
         self.EVT_CLIENT_VOTE = self.console.getEventID('EVT_CLIENT_VOTE')
         if self.EVT_CLIENT_VOTE:
             self.registerEvent(self.EVT_CLIENT_VOTE)
-
 
     def onEvent(self, event):
         """\
@@ -312,7 +272,6 @@ class ChatloggerPlugin(b3.plugin.Plugin):
             self.console.storage.query(q)
         else:
             self.warning('max_age_cmd is invalid [%s]' % self._max_age_cmd_in_days)
-
 
     def string2days(self, text):
         """ convert max age string to days. (max age can be written as : 2d for 'two days', etc) """
@@ -483,6 +442,9 @@ if __name__ == '__main__':
     import MySQLdb
     from b3.fake import FakeClient, fakeConsole, joe, simon
     from b3.storage import DatabaseStorage
+    import os
+
+    sql_file = os.path.join(os.path.dirname(__file__), '../chatlogger.sql')
 
     db = MySQLdb.connect(host='localhost', user='b3test', passwd='test')
     db.query("DROP DATABASE IF EXISTS b3_test")
@@ -490,31 +452,7 @@ if __name__ == '__main__':
 
     fakeConsole.storage = DatabaseStorage("mysql://b3test:test@localhost/b3_test", fakeConsole)
     fakeConsole.storage.executeSql("@b3/sql/b3.sql")
-    fakeConsole.storage.query("""CREATE TABLE `chatlog` (
-        `id` int(11) unsigned NOT NULL auto_increment,
-        `msg_time` int(10) unsigned NOT NULL,
-        `msg_type` enum('ALL','TEAM','PM') NOT NULL,
-        `client_id` int(11) unsigned NOT NULL,
-        `client_name` varchar(32) NOT NULL,
-        `client_team` tinyint(1) NOT NULL,
-        `msg` varchar(528) NOT NULL,
-        `target_id` int(11) unsigned default NULL,
-        `target_name` varchar(32) default NULL,
-        `target_team` tinyint(1) default NULL,
-        PRIMARY KEY    (`id`),
-        KEY `client` (`client_id`)
-    ) ENGINE=MyISAM DEFAULT CHARSET=utf8;""")
-    fakeConsole.storage.query("""CREATE TABLE `cmdlog` (
-        `id` int(11) unsigned NOT NULL auto_increment,
-        `cmd_time` int(10) unsigned NOT NULL,
-        `admin_id` int(11) unsigned NOT NULL,
-        `admin_name` varchar(32) NOT NULL,
-        `command` varchar(100) NULL,
-        `data` varchar(528) default NULL,
-        `result` varchar(528) default NULL,
-        PRIMARY KEY (`id`),
-        KEY `client` (`admin_id`)
-    ) ENGINE=MyISAM DEFAULT CHARSET=utf8;""")
+    fakeConsole.storage.executeSql(sql_file)
 
     def sendsPM(self, msg, target):
         print "\n%s PM to %s : \"%s\"" % (self.name, msg, target)
@@ -522,58 +460,23 @@ if __name__ == '__main__':
 
     FakeClient.sendsPM = sendsPM
 
-    conf1 = b3.config.XmlConfigParser()
-    conf1.loadFromString("""
-    <configuration plugin="chatlogger">
+    from b3.config import CfgConfigParser
+    conf1 = CfgConfigParser()
+    from textwrap import dedent
+    conf1.loadFromString(dedent("""
+        [general]
+        save_to_database: Yes
+        save_to_file: no
 
-        <settings name="general">
-         <!-- do you want to save chat log to database ? -->
-         <set name="save_to_database">Yes</set>
+        [file]
+        logfile: @conf/chat.log
+        rotation_rate: D
 
-         <!-- do you want to save chat log to a file ? -->
-         <set name="save_to_file">no</set>
-            </settings>
-
-        <settings name="file">
-            <!-- location of the chat log file -->
-            <set name="logfile">@conf/chat.log</set>
-            <!-- file rotation rate. Can be either :
-                H : every hour
-                D : every day
-                W0 : every monday
-                W1 : every tuesday
-                W6 : every sunday
-             -->
-                <set name="rotation_rate">D</set>
-        </settings>
-
-        <!-- optionally you can choose a different name for the table used
-        to store the log. Default is 'chatlog'. To do so, uncomment the
-        following part: -->
-        <!--<settings name="database">
-            <set name="db_table">chatlog2</set>
-        </settings>-->
-
-            <settings name="purge">
-                <!-- how long (in days) do you want the history to be kept for.
-                    0 : keep chat log history for ever (default value)
-                    You can use the following syntax as well
-                    3d : purge all chat older than 3 days
-                    2w : two weeks
-                    6m : six month
-                    1y : one year
-                -->
-                <set name="max_age">0</set>
-
-                <!-- The purge action takes place once a day at the time define below.
-                Default time is midnight -->
-                <set name="hour">0</set>
-                <!-- hour between 0 and 23 -->
-                <set name="min">0</set>
-                <!-- min between 0 and 59 -->
-            </settings>
-    </configuration>
-    """)
+        [purge]
+        max_age: 0
+        hour: 0
+        min: 0
+    """))
     p = ChatloggerPlugin(fakeConsole, conf1)
     p.onLoadConfig()
     p.onStartup()

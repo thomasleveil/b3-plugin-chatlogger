@@ -19,8 +19,15 @@
 import logging
 import threading
 import sys
+
+from mockito import when, unstub
+
 from b3.config import XmlConfigParser
+from b3.update import B3version
+from b3 import __version__ as b3_version
 import b3.output  # do not remove, needed because the module alters some defaults of the logging module
+from b3.plugins.admin import AdminPlugin
+
 
 log = logging.getLogger('output')
 log.setLevel(logging.WARNING)
@@ -63,21 +70,37 @@ def flush_console_streams():
     sys.stdout.flush()
 
 
+def cleanUp():
+    unstub()
+    flush_console_streams()
+    testcase_lock.release()
+
+
 class B3TestCase(unittest.TestCase):
     def setUp(self):
         testcase_lock.acquire()
+        self.addCleanup(cleanUp)
         flush_console_streams()
         # create a FakeConsole parser
         self.parser_conf = XmlConfigParser()
         self.parser_conf.loadFromString(r"""<configuration/>""")
         with logging_disabled():
             from b3.fake import FakeConsole
+
             self.console = FakeConsole(self.parser_conf)
+
+        # load the admin plugin
+        if B3version(b3_version) >= B3version("1.10dev"):
+            admin_plugin_conf_file = '@b3/conf/plugin_admin.ini'
+        else:
+            admin_plugin_conf_file = '@b3/conf/plugin_admin.xml'
+        with logging_disabled():
+            self.adminPlugin = AdminPlugin(self.console, admin_plugin_conf_file)
+            self.adminPlugin.onStartup()
+
+        # make sure the admin plugin obtained by other plugins is our admin plugin
+        when(self.console).getPlugin('admin').thenReturn(self.adminPlugin)
 
         self.console.screen = Mock()
         self.console.time = time.time
         self.console.upTime = Mock(return_value=3)
-
-    def tearDown(self):
-        flush_console_streams()
-        testcase_lock.release()

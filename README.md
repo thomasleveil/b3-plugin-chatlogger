@@ -14,14 +14,16 @@ Forum : http://www.bigbrotherbot.com/forums/index.php?topic=423
 Installation
 ------------
 
- * copy chatlogger.py into b3/extplugins
- * copy plugin_chatlogger.xml into b3/extplugins/conf
- * create the chatlog table in your database importing the chatlogger.sql file.
+ * copy chatlogger.py into `b3/extplugins`
+ * copy plugin_chatlogger.ini into into your config directory
+ * create the chatlog table in your database importing the `chatlogger.sql` file.
  * update your main b3 config file with :
-<plugin name="chatlogger" config="@b3/extplugins/conf/plugin_chatlogger.xml"/>
+```
+<plugin name="chatlogger" config="@conf/plugin_chatlogger.xml"/>
+```
 
-NOTE : if you are using the censor plugin, make sure the priority of the chatlogger plugin is less
-than the priority of the censor plugin or you won't log any messages containing censored words.
+NOTE : if you are using the censor plugin, make sure the chatlogger plugin is loaded before the censor plugin or you
+won't log any messages containing censored words.
 
 
 Changelog
@@ -78,3 +80,5 @@ Changelog
 12/08/2012 - 1.3.1 - Courgette
  - gracefully fallback on default values when part of the config is missing
 
+18/08/2013 - 1.3.2 - Courgette
+ - plugin config file is now a .ini file
