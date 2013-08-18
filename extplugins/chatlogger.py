@@ -22,7 +22,7 @@
 import time
 import logging
 
-from cron import PluginCronTab
+from b3.cron import PluginCronTab
 from b3.plugin import Plugin
 from b3.config import ConfigParser
 import b3.events
