@@ -104,3 +104,9 @@ class B3TestCase(unittest.TestCase):
         self.console.screen = Mock()
         self.console.time = time.time
         self.console.upTime = Mock(return_value=3)
+
+    def tearDown(self):
+        try:
+            self.console.storage.closeConnection()
+        except:
+            pass

@@ -2,7 +2,7 @@
 CREATE TABLE `chatlog` (
   `id` int(11) unsigned NOT NULL auto_increment,
   `msg_time` int(10) unsigned NOT NULL,
-  `msg_type` enum('ALL','TEAM','PM') NOT NULL,
+  `msg_type` enum('ALL','TEAM','PM','SQUAD') NOT NULL,
   `client_id` int(11) unsigned NOT NULL,
   `client_name` varchar(32) NOT NULL,
   `client_team` tinyint(1) NOT NULL,

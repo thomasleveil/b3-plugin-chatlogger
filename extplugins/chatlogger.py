@@ -19,7 +19,6 @@
 #
 # Changelog: see README.md file
 #
-import time
 import logging
 
 from b3.cron import PluginCronTab
@@ -28,7 +27,7 @@ from b3.config import ConfigParser
 import b3.events
 from b3.timezones import timezones
 
-__version__ = '1.3.2'
+__version__ = '1.4'
 __author__ = 'Courgette, xlr8or, BlackMamba, OliverWieland'
 
 
@@ -206,6 +205,10 @@ class ChatloggerPlugin(Plugin):
         self.registerEvent(self.console.getEventID('EVT_CLIENT_PRIVATE_SAY'))
         self.registerEvent(self.console.getEventID('EVT_ADMIN_COMMAND'))
 
+        self.EVT_CLIENT_SQUAD_SAY = self.console.getEventID('EVT_CLIENT_SQUAD_SAY')
+        if self.EVT_CLIENT_SQUAD_SAY:
+            self.registerEvent(self.EVT_CLIENT_SQUAD_SAY)
+
         self.EVT_CLIENT_RADIO = self.console.getEventID('EVT_CLIENT_RADIO')
         if self.EVT_CLIENT_RADIO:
             self.registerEvent(self.EVT_CLIENT_RADIO)
@@ -229,27 +232,31 @@ class ChatloggerPlugin(Plugin):
             chat = ChatData(self, event)
             chat._table = self._db_table
             chat.save()
-        if event.type == b3.events.EVT_CLIENT_TEAM_SAY:
+        elif event.type == b3.events.EVT_CLIENT_TEAM_SAY:
             chat = TeamChatData(self, event)
             chat._table = self._db_table
             chat.save()
-        if event.type == b3.events.EVT_CLIENT_PRIVATE_SAY:
+        elif event.type == b3.events.EVT_CLIENT_PRIVATE_SAY:
             chat = PrivateChatData(self, event)
             chat._table = self._db_table
             chat.save()
-        if event.type == b3.events.EVT_ADMIN_COMMAND:
+        elif event.type == b3.events.EVT_ADMIN_COMMAND:
             cmd = CmdData(self, event)
             cmd._table = self._db_table_cmdlog
             cmd.save()
-        if self.EVT_CLIENT_RADIO and event.type == self.EVT_CLIENT_RADIO:
+        elif self.EVT_CLIENT_SQUAD_SAY and event.type == self.EVT_CLIENT_SQUAD_SAY:
+            chat = SquadChatData(self, event)
+            chat._table = self._db_table
+            chat.save()
+        elif self.EVT_CLIENT_RADIO and event.type == self.EVT_CLIENT_RADIO:
             data = ClientRadioData(self, event)
             data._table = self._db_table
             data.save()
-        if self.EVT_CLIENT_CALLVOTE and event.type == self.EVT_CLIENT_CALLVOTE:
+        elif self.EVT_CLIENT_CALLVOTE and event.type == self.EVT_CLIENT_CALLVOTE:
             data = ClientCallVoteData(self, event)
             data._table = self._db_table
             data.save()
-        if self.EVT_CLIENT_VOTE and event.type == self.EVT_CLIENT_VOTE:
+        elif self.EVT_CLIENT_VOTE and event.type == self.EVT_CLIENT_VOTE:
             data = ClientVoteData(self, event)
             data._table = self._db_table
             data.save()
@@ -343,7 +350,7 @@ class CmdData(AbstractData):
             table_name=self._table)
 
     def save(self):
-        self.plugin.debug("%s, %s, %s, %s, %s" % (self.admin_id, self.admin_name, self.command, self.data, self.result))
+        self.plugin.verbose("%s, %s, %s, %s, %s" % (self.admin_id, self.admin_name, self.command, self.data, self.result))
         data = {'time': self.plugin.console.time(),
                 'admin_id': self.admin_id,
                 'admin_name': self.admin_name,
@@ -383,7 +390,7 @@ class ChatData(AbstractData):
             %(target_name)s, %(target_team)s )""".format(table_name=self._table)
 
     def save(self):
-        self.plugin.debug("%s, %s, %s, %s" % (self.msg_type, self.client_id, self.client_name, self.msg))
+        self.plugin.verbose("%s, %s, %s, %s" % (self.msg_type, self.client_id, self.client_name, self.msg))
         data = {'time': self.plugin.console.time(),
                 'type': self.msg_type,
                 'client_id': self.client_id,
@@ -401,12 +408,15 @@ class ChatData(AbstractData):
             self._save2db(data)
 
     def _save2file(self, data):
-        self.plugin.debug("writing to file")
         self.plugin._filelogger.info("@%(client_id)s [%(client_name)s] to %(type)s:\t%(msg)s" % data)
 
 
 class TeamChatData(ChatData):
     msg_type = 'TEAM'
+
+
+class SquadChatData(ChatData):
+    msg_type = 'SQUAD'
 
 
 class PrivateChatData(ChatData):
@@ -437,70 +447,3 @@ class ClientVoteData(ChatData):
         ChatData.__init__(self, plugin, event)
         self.msg = 'VOTE %s' % event.data
 
-
-if __name__ == '__main__':
-    import MySQLdb
-    from b3.fake import FakeClient, fakeConsole, joe, simon
-    from b3.storage import DatabaseStorage
-    import os
-
-    sql_file = os.path.join(os.path.dirname(__file__), '../chatlogger.sql')
-
-    db = MySQLdb.connect(host='localhost', user='b3test', passwd='test')
-    db.query("DROP DATABASE IF EXISTS b3_test")
-    db.query("CREATE DATABASE b3_test CHARACTER SET utf8;")
-
-    fakeConsole.storage = DatabaseStorage("mysql://b3test:test@localhost/b3_test", fakeConsole)
-    fakeConsole.storage.executeSql("@b3/sql/b3.sql")
-    fakeConsole.storage.executeSql(sql_file)
-
-    def sendsPM(self, msg, target):
-        print "\n%s PM to %s : \"%s\"" % (self.name, msg, target)
-        self.console.queueEvent(b3.events.Event(b3.events.EVT_CLIENT_PRIVATE_SAY, msg, self, target))
-
-    FakeClient.sendsPM = sendsPM
-
-    from b3.config import CfgConfigParser
-    conf1 = CfgConfigParser()
-    from textwrap import dedent
-    conf1.loadFromString(dedent("""
-        [general]
-        save_to_database: Yes
-        save_to_file: no
-
-        [file]
-        logfile: @conf/chat.log
-        rotation_rate: D
-
-        [purge]
-        max_age: 0
-        hour: 0
-        min: 0
-    """))
-    p = ChatloggerPlugin(fakeConsole, conf1)
-    p.onLoadConfig()
-    p.onStartup()
-
-    joe.connects(1)
-    simon.connects(3)
-
-    joe.says("sql injec;tion ' test")
-    joe.sendsPM("sql; injection ' test", simon)
-    joe.says("!help sql injection ' test;")
-
-    joe.name = "j'oe"
-    simon.name = "s;m'n"
-    joe.says("sql injection test2")
-    joe.sendsPM("sql injection test2", simon)
-    joe.says("!help sql injection test2")
-
-    joe.name = "Joe"
-    simon.name = "Simon"
-
-    while True:
-        joe.says("hello")
-        simon.says2team("team test")
-        joe.sendsPM("PM test", simon)
-        simon.says("!help test command")
-
-        time.sleep(20)
