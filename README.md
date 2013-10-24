@@ -19,7 +19,7 @@ Installation
  * create the chatlog table in your database importing the `chatlogger.sql` file.
  * update your main b3 config file with :
 ```
-<plugin name="chatlogger" config="@conf/plugin_chatlogger.xml"/>
+<plugin name="chatlogger" config="@conf/plugin_chatlogger.ini"/>
 ```
 
 NOTE : if you are using the censor plugin, make sure the chatlogger plugin is loaded before the censor plugin or you
