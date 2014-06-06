@@ -14,10 +14,10 @@ env:
     - B3_REPO='git+git://github.com/thomasleveil/big-brother-bot.git@master#egg=b3'
     - B3_REPO='git+git://github.com/thomasleveil/big-brother-bot.git@release-1.10#egg=b3'
 
-# command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
+# command to install dependencies, e.g. pip install -r requirements.txt 
 install:
-  - pip install unittest2 mockito mock mysql-python --use-mirrors
-  - pip install -e ${B3_REPO} --use-mirrors
+  - pip install unittest2 mockito mock mysql-python
+  - pip install -e ${B3_REPO}
 
 # command to run tests, e.g. python setup.py test
 script: PYTHONPATH=extplugins nosetests --where=tests --verbosity=3
