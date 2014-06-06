@@ -11,8 +11,8 @@ before_script:
 env:
   global: MYSQL_TEST_HOST=127.0.0.1 MYSQL_TEST_USER=travis MYSQL_TEST_PASSWORD='' MYSQL_TEST_DB=b3_test
   matrix:
-    - B3_REPO='git+git://github.com/thomasleveil/big-brother-bot.git@master#egg=b3'
-    - B3_REPO='git+git://github.com/thomasleveil/big-brother-bot.git@release-1.10#egg=b3'
+    - B3_REPO='git+git://github.com/BigBrotherBot/big-brother-bot.git@master#egg=b3'
+    - B3_REPO='git+git://github.com/BigBrotherBot/big-brother-bot.git@release-1.10#egg=b3'
 
 # command to install dependencies, e.g. pip install -r requirements.txt 
 install:
