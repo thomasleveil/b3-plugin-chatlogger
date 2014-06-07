@@ -9,10 +9,13 @@ before_script:
   - mysql -e 'create database b3_test;'
 
 env:
-  global: MYSQL_TEST_HOST=127.0.0.1 MYSQL_TEST_USER=travis MYSQL_TEST_PASSWORD='' MYSQL_TEST_DB=b3_test
+  global: MYSQL_TEST_HOST=127.0.0.1 MYSQL_TEST_USER=travis MYSQL_TEST_PASSWORD=travis MYSQL_TEST_DB=b3_test
   matrix:
     - B3_REPO='git+git://github.com/BigBrotherBot/big-brother-bot.git@master#egg=b3'
     - B3_REPO='git+git://github.com/BigBrotherBot/big-brother-bot.git@release-1.10#egg=b3'
+
+before_script:
+  - mysql -e "SET PASSWORD FOR travis = PASSWORD('travis');"
 
 # command to install dependencies, e.g. pip install -r requirements.txt 
 install:
