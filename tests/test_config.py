@@ -71,6 +71,8 @@ class Test_Config(B3TestCase):
         self.assertEqual(0, self.p._max_age_cmd_in_days)
         self.assertEqual(0, self.p._hours)
         self.assertEqual(0, self.p._minutes)
+        self.assertEqual("chatlog", self.p._db_table)
+        self.assertEqual("cmdlog", self.p._db_table_cmdlog)
 
     def test_conf1(self):
         self.init(dedent("""
@@ -87,3 +89,12 @@ class Test_Config(B3TestCase):
         self.assertEqual(0, self.p._max_age_cmd_in_days)
         self.assertEqual(4, self.p._hours)
         self.assertEqual(0, self.p._minutes)
+
+    def test_database(self):
+        self.init(dedent("""
+            [database]
+            db_table: chatlog2
+            db_table_cmdlog: cmdlog2
+        """))
+        self.assertEqual("chatlog2", self.p._db_table)
+        self.assertEqual("cmdlog2", self.p._db_table_cmdlog)
