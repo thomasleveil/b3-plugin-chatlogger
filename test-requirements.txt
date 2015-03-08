@@ -1,0 +1,4 @@
+# list of python modules required to run the test suite
+mockito
+mock
+unittest2

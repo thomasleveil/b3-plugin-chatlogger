@@ -1,0 +1,1 @@
+# list of additional python modules required for this plugin (do not list here modules already required by B3)

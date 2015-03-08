@@ -8,7 +8,7 @@ from mockito import when
 from chatlogger import ChatloggerPlugin
 from b3 import TEAM_RED, TEAM_BLUE
 from b3.config import CfgConfigParser
-from b3.storage import DatabaseStorage
+from b3.storage import getStorage
 import b3.events
 from chatlogger import __file__ as chatlogger__file__
 from tests import B3TestCase, logging_disabled
@@ -78,7 +78,7 @@ class Test_mysql(B3TestCase):
         db.query("DROP DATABASE IF EXISTS %s" % MYSQL_TEST_DB)
         db.query("CREATE DATABASE %s CHARACTER SET utf8;" % MYSQL_TEST_DB)
 
-        self.console.storage = DatabaseStorage(
+        self.console.storage = getStorage(
             'mysql://%s:%s@%s/%s' % (MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, MYSQL_TEST_HOST, MYSQL_TEST_DB), self.console)
         self.console.storage.executeSql("@b3/sql/b3.sql")
         self.console.storage.executeSql(CHATLOGGER_SQL_FILE)

@@ -1,12 +1,6 @@
 # TravisCI config file. See http://travis-ci.org
 language: python
-
-python:
-  - 2.6
-  - 2.7
-
-before_script:
-  - mysql -e 'create database b3_test;'
+python: 2.7
 
 env:
   global: MYSQL_TEST_HOST=127.0.0.1 MYSQL_TEST_USER=travis MYSQL_TEST_PASSWORD=travis MYSQL_TEST_DB=b3_test
@@ -15,12 +9,13 @@ env:
     - B3_REPO='git+git://github.com/BigBrotherBot/big-brother-bot.git@release-1.10#egg=b3'
 
 before_script:
-  - mysql -e "SET PASSWORD FOR travis = PASSWORD('travis');"
+  - mysql -e 'create database b3_test;'
 
 # command to install dependencies, e.g. pip install -r requirements.txt 
 install:
-  - pip install unittest2 mockito mock mysql-python
   - pip install -e ${B3_REPO}
+  - pip install -r requirements.txt
+  - pip install -r test-requirements.txt
 
 # command to run tests, e.g. python setup.py test
 script: PYTHONPATH=extplugins nosetests --where=tests --verbosity=3

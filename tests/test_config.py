@@ -13,7 +13,7 @@ from tests import B3TestCase, logging_disabled
 from chatlogger import __file__ as chatlogger__file__
 
 
-CHATLOGGER_CONFIG_FILE = os.path.join(os.path.dirname(chatlogger__file__), 'conf/plugin_chatlogger.ini')
+CHATLOGGER_CONFIG_FILE = os.path.join(os.path.dirname(chatlogger__file__), '../conf/plugin_chatlogger.ini')
 
 
 class Test_Config(B3TestCase):
@@ -38,8 +38,7 @@ class Test_Config(B3TestCase):
             if os.path.isfile(CHATLOGGER_CONFIG_FILE):
                 self.conf.load(CHATLOGGER_CONFIG_FILE)
             else:
-                unittest.skip("default config file '%s' does not exists" % CHATLOGGER_CONFIG_FILE)
-                return
+                raise unittest.SkipTest("default config file '%s' does not exists" % CHATLOGGER_CONFIG_FILE)
         self.p.onLoadConfig()
         self.p.onStartup()
 

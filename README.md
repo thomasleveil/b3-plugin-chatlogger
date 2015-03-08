@@ -14,10 +14,19 @@ Forum : http://www.bigbrotherbot.com/forums/index.php?topic=423
 Installation
 ------------
 
- * copy chatlogger.py into `b3/extplugins`
+ * copy the chatlogger directory into your B3 `extplugins` directory
  * copy plugin_chatlogger.ini into into your config directory
- * create the chatlog table in your database importing the `chatlogger.sql` file.
- * update your main b3 config file with :
+ * create the chatlog table in your database importing the `sql/chatlogger.sql` file.
+ * update your main b3 config file as follow:
+
+   - if you are using b3.ini, add to the `[plugins]` section:
+
+```
+chatlogger: @conf/plugin_chatlogger.ini
+```
+   
+   - if you are using b3.xml, add to the `<plugins>` section:
+
 ```
 <plugin name="chatlogger" config="@conf/plugin_chatlogger.ini"/>
 ```
