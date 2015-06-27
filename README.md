@@ -10,6 +10,9 @@ Description
 This plugin logs to database and/or file all clients' messages (chat, team chat, private chat).
 Forum : http://www.bigbrotherbot.com/forums/index.php?topic=423
 
+******
+*NOTE: since B3 v1.10.1 beta this plugin has been included in the standard plugins set, thus all patches and updates will be performed in the official B3 repository.*
+******
 
 Installation
 ------------
